@@ -8,6 +8,10 @@ WORKDIR /app
 
 # Retrieve application dependencies using go modules.
 # Allows container builds to reuse downloaded dependencies.
+ARG user
+ARG personal_access_token
+RUN echo "machine github.com login ${user} password ${personal_access_token}" > ~/.netrc
+RUN GOPRIVATE=github.com/moraisworkrunner
 COPY go.* ./
 RUN go mod download
 
