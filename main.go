@@ -50,7 +50,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("Failed to Marshal work response proto: %v\n", body)
 			return
 		}
-		createTask("moraisworkrunner", location, target, string(body), webhookURL)
+		createTask("moraisworkrunner", location, target, webhookURL, string(body))
 	}(&workResponse)
 
 	// Do something with the payload, and return the appropriate status
