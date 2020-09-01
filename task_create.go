@@ -28,14 +28,11 @@ func createTask(projectID, locationID, queueID, webhookURL, message string) (*ta
 	req := &taskspb.CreateTaskRequest{
 		Parent: queuePath,
 		Task: &taskspb.Task{
-			// https://godoc.org/google.golang.org/genproto/googleapis/cloud/tasks/v2#AppEngineHttpRequest
-			MessageType: &taskspb.Task_AppEngineHttpRequest{
-				AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
-					AppEngineRouting: &taskspb.AppEngineRouting{
-						Host: webhookURL,
-					},
-					HttpMethod:  taskspb.HttpMethod_POST,
-					RelativeUri: "/",
+			// https://godoc.org/google.golang.org/genproto/googleapis/cloud/tasks/v2#HttpRequest
+			MessageType: &taskspb.Task_HttpRequest{
+				HttpRequest: &taskspb.HttpRequest{
+					HttpMethod: taskspb.HttpMethod_POST,
+					Url:        webhookURL,
 				},
 			},
 		},
