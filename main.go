@@ -22,7 +22,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse the body and protobuf message from the request
-	in := &work_messages.SvcWorkRequest{}
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		workResponse.Error = &work_messages.Error{
@@ -32,6 +31,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// Do not retry
 		return
 	}
+	in := &work_messages.SvcWorkRequest{}
 	if err := proto.Unmarshal(body, in); err != nil {
 		workResponse.Error = &work_messages.Error{
 			Message: fmt.Sprintf("Failed to parse work request: %s", err),
