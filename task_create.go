@@ -39,7 +39,7 @@ func createTask(projectID, locationID, queueID, webhookURL, message string) (*ta
 	}
 
 	// Add a payload message if one is present.
-	req.Task.GetAppEngineHttpRequest().Body = []byte(message)
+	req.Task.GetHttpRequest().Body = []byte(message)
 
 	createdTask, err := client.CreateTask(ctx, req)
 	if err != nil {
