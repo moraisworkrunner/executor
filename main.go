@@ -69,6 +69,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// Only applies when a queue and service have been specified as a destination,
 		// allowing management through infra, such as expoential retry back-off.
 		if taskExecutionCount == maxAttempts {
+			fmt.Printf("Max-Attempts reached: %d\n", taskExecutionCount)
 			if len(problematicQueue) > 0 && len(problematicService) > 0 {
 				fmt.Printf("Pushing problematic work to %s\n", problematicQueue)
 				// Issue a task to pass the message to the next queue
