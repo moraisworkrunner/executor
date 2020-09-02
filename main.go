@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 
 	work_messages "github.com/moraisworkrunner/work-messages"
 	"google.golang.org/protobuf/proto"
@@ -20,6 +21,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if location == "" {
 		location = "nowhere"
 	}
+	retryThresholdStr := os.Getenv("RETRY_THRESHOLD")
+	if retryThresholdStr == "" {
+		retryThresholdStr = "7"
+	}
+	retryThreshold, err := strconv.Atoi(retryThresholdStr)
+	if err != nil {
+		retryThreshold = 7
+	}
+	// Where to send and who will service problematic requests
+	problematicQueue := os.Getenv("PROBLEM_QUEUE")
+	problematicService := os.Getenv("PROBLEM_SERVICE")
 
 	// Parse the body and protobuf message from the request
 	body, err := ioutil.ReadAll(r.Body)
@@ -53,13 +65,27 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		createTask("moraisworkrunner", location, target, webhookURL, string(body))
 	}(&workResponse)
 
+	taskExecutionCount, err := strconv.Atoi(r.Header.Get("X-CloudTasks-TaskExecutionCount"))
+	if err != nil {
+		fmt.Printf("Warning: Cannot read X-CloudTasks-TaskExecutionCount header in request\n")
+	}
 	// Do something with the payload, and return the appropriate status
 	if err := processWork(in); err != nil {
-		// process the work request
+		// "retryThreshold" enables pushing of problematic work to a different queue.
+		// Only applies when a queue and service have been specified as a destination,
+		// allowing management through infra, such as expoential retry back-off.
+		if taskExecutionCount > retryThreshold &&
+			len(problematicQueue) > 0 &&
+			len(problematicService) > 0 {
+			fmt.Printf("Pushing problematic work to %s\n", problematicQueue)
+			createTask("moraisworkrunner", location, problematicQueue, problematicService, string(body))
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
 		workResponse.Error = &work_messages.Error{
 			Message: err.Error(),
 		}
-		w.WriteHeader(http.StatusBadRequest)
 	} else {
 		w.WriteHeader(http.StatusAccepted)
 	}
