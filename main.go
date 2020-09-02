@@ -59,6 +59,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("Warning: Cannot read X-CloudTasks-TaskExecutionCount header in request\n")
 	}
+	fmt.Printf("Task-Execution-Count: %d\n", taskExecutionCount)
 	// Do something with the payload, and return the appropriate status
 	if err := processWork(in); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
