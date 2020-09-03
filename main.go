@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,13 +8,8 @@ import (
 	"os"
 	"strconv"
 
-	"cloud.google.com/go/logging"
 	work_messages "github.com/moraisworkrunner/work-messages"
 	"google.golang.org/protobuf/proto"
-)
-
-var (
-	logger *log.Logger
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +40,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		workResponse.Error = &work_messages.Error{
 			Message: fmt.Sprintf("Failed to read request"),
 		}
-		logger.Printf("Failed to read work request: %v\n", r.Body)
+		log.Printf("Failed to read work request: %v\n", r.Body)
 		// Do not retry
 		return
 	}
@@ -55,7 +49,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		workResponse.Error = &work_messages.Error{
 			Message: fmt.Sprintf("Failed to parse work request: %s", err),
 		}
-		logger.Printf("Failed to unmarshal proto: %v\n", body)
+		log.Printf("Failed to unmarshal proto: %v\n", body)
 		// Do not retry
 		return
 	}
@@ -64,10 +58,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	taskExecutionCount, err := strconv.Atoi(r.Header.Get("X-CloudTasks-TaskExecutionCount"))
 	if err != nil {
-		logger.Printf("Warning: Cannot read X-CloudTasks-TaskExecutionCount header in request\n")
+		log.Printf("Warning: Cannot read X-CloudTasks-TaskExecutionCount header in request\n")
 	}
-	logger.Printf("Task-Execution-Count: %d\n", taskExecutionCount)
-	logger.Printf("")
+	log.Printf("Task-Execution-Count: %d\n", taskExecutionCount)
+	log.Printf("Headers: %v", r.Header)
 	// Do something with the payload, and return the appropriate status
 	if err := processWork(in); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -78,9 +72,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// Only applies when a queue and service have been specified as a destination,
 		// allowing management through infra, such as expoential retry back-off.
 		if taskExecutionCount == maxAttempts {
-			logger.Printf("Max-Attempts reached: %d\n", taskExecutionCount)
+			log.Printf("Max-Attempts reached: %d\n", taskExecutionCount)
 			if len(problematicQueue) > 0 && len(problematicService) > 0 {
-				logger.Printf("Pushing problematic work to %s\n", problematicQueue)
+				log.Printf("Pushing problematic work to %s\n", problematicQueue)
 				// Issue a task to pass the message to the next queue
 				createTask("moraisworkrunner", location, problematicQueue, problematicService, string(body))
 				return
@@ -88,7 +82,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			// Issue a task of "failure" to the notifier queue
 			body, err = proto.Marshal(&workResponse)
 			if err != nil {
-				logger.Printf("Failed to Marshal work response proto: %v\n", body)
+				log.Printf("Failed to Marshal work response proto: %v\n", body)
 				return
 			}
 			createTask("moraisworkrunner", location, target, webhookURL, string(body))
@@ -100,7 +94,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	// Issue a task to the notifier queue once handling has completed
 	body, err = proto.Marshal(&workResponse)
 	if err != nil {
-		logger.Printf("Failed to Marshal work response proto: %v\n", body)
+		log.Printf("Failed to Marshal work response proto: %v\n", body)
 		return
 	}
 	createTask("moraisworkrunner", location, target, webhookURL, string(body))
@@ -108,7 +102,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func processWork(in *work_messages.SvcWorkRequest) error {
 	// do "work" with the request
-	logger.Printf("%s - %s -> %s\n", in.FileMetadata.GetMd5(), in.SourceFile, in.WebhookUrl)
+	log.Printf("%s - %s -> %s\n", in.FileMetadata.GetMd5(), in.SourceFile, in.WebhookUrl)
 	if in.SourceFile == "invalid" {
 		return fmt.Errorf("Error: invalid source file")
 	}
@@ -116,21 +110,13 @@ func processWork(in *work_messages.SvcWorkRequest) error {
 }
 
 func main() {
-	// Creates a client.
-	client, err := logging.NewClient(context.Background(), "moraisworkrunner")
-	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
-	}
-	defer client.Close()
-	logger = client.Logger("morais").StandardLogger(logging.Info)
-
-	logger.Print("starting server...\n")
+	log.Print("starting server...\n")
 	http.HandleFunc("/", handler)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	logger.Printf("listening on port %s\n", port)
-	logger.Print(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+	log.Printf("listening on port %s\n", port)
+	log.Print(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 	os.Exit(0)
 }
