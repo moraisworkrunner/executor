@@ -12,6 +12,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var (
+	retryCountHeader = "X-CloudTasks-TaskExecutionCount"
+)
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	workResponse := work_messages.SvcWorkResponse{}
 	target := os.Getenv("NOTIFIER_QUEUE")
@@ -26,10 +30,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if maxAttemptsStr == "" {
 		maxAttemptsStr = "20"
 	}
-	maxAttempts, err := strconv.Atoi(maxAttemptsStr)
+	maxAtt, err := strconv.Atoi(maxAttemptsStr)
 	if err != nil {
-		maxAttempts = 20
+		maxAtt = 20
 	}
+	maxAttempts := int64(maxAtt)
 	// Where to send, and who will service, problematic requests
 	problematicQueue := os.Getenv("PROBLEM_QUEUE")
 	problematicService := os.Getenv("PROBLEM_SERVICE")
@@ -56,12 +61,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	workResponse.Context = in.Context
 	webhookURL := in.WebhookUrl
 
-	taskExecutionCount, err := strconv.Atoi(r.Header.Get("X-CloudTasks-TaskExecutionCount"))
-	if err != nil {
-		log.Printf("Warning: Cannot read X-CloudTasks-TaskExecutionCount header in request\n")
-	}
-	log.Printf("Task-Execution-Count: %d\n", taskExecutionCount)
-	log.Printf("Headers: %v", r.Header)
 	// Do something with the payload, and return the appropriate status
 	if err := processWork(in); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -71,8 +70,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// "maxAttempts" may be leveraged to push problematic work to a different queue.
 		// Only applies when a queue and service have been specified as a destination,
 		// allowing management through infra, such as expoential retry back-off.
-		if taskExecutionCount == maxAttempts {
-			log.Printf("Max-Attempts reached: %d\n", taskExecutionCount)
+		if areRetriesExhausted(maxAttempts, r) {
 			if len(problematicQueue) > 0 && len(problematicService) > 0 {
 				log.Printf("Pushing problematic work to %s\n", problematicQueue)
 				// Issue a task to pass the message to the next queue
@@ -107,6 +105,19 @@ func processWork(in *work_messages.SvcWorkRequest) error {
 		return fmt.Errorf("Error: invalid source file")
 	}
 	return nil
+}
+
+func areRetriesExhausted(maxRetryCount int64, req *http.Request) bool {
+	retries := req.Header.Get(retryCountHeader)
+	if retries != "" {
+		r, err := strconv.ParseInt(retries, 10, 32)
+		if err != nil {
+			log.Printf("Failed to parse header value %s to an int: %v", retries, err)
+			return false
+		}
+		return r >= maxRetryCount
+	}
+	return false
 }
 
 func main() {
