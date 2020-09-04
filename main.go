@@ -63,7 +63,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	// Do something with the payload, and return the appropriate status
 	if err := processWork(in); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		workResponse.Error = &work_messages.Error{
 			Message: err.Error(),
 		}
