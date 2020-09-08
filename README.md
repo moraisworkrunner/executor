@@ -45,6 +45,8 @@ In theory, if the environment-provided MAX_ATTEMPTS is equal to the current head
 
 For some reason, the X-CloudTasks-TaskExecutionCount is always set to 0. It could be that a specific response code is neded to tell the queue to count each execution properly, or that it is a bug. Google does not seem to think so.. https://issuetracker.google.com/issues/148756284
 
+A bug worth fixing!
+
 ## Scaling
 
 When dealing with a finite queue and retries, inevitably one could face the issue where there are many failed requests being retried `X` times causing low throughput of likely-successful tasks until the issue subsides naturally.
